@@ -7,25 +7,6 @@
 (define (member? elem lst)
   (list? (memq elem lst)))
 
-; Predicate for determining whether an instrument value is valid
-; - 'instrument' is valid if its a symbol and is among valid instruments
-(define (valid-instrument? instrument)
-  (define (get-valid-instruments)
-    '(piano organ guitar violin flute trumpet helicopter telephone))
-  (and (symbol? instrument)
-       (member? instrument (get-valid-instruments))))
-
-; Predicate for determining whether a pitch value is valid
-; - 'pitch' is valid if it's an integer in interval [0,127]
-(define (valid-pitch? pitch)
-  (and (integer? pitch)
-       (and (>= pitch 0) (<= pitch 127))))
-
-; Predicate for determining whether a duration valid is valid
-; - 'duration' is valid if its an integer > 0
-(define (valid-duration? duration)
-  (and (integer? duration) (> duration 0)))
-
 ; Predicate for determining whether a list is a property-list
 ; - 'lst' is a property list if every other element is a key of type symbol
 ;         and there exists a value following each key
@@ -106,6 +87,91 @@
 	((pred (car lst)) (for-all? pred (cdr lst)))
 	(else #f)))
 
+; Predicate for determining whether an instrument value is valid
+; - 'instrument' is valid if its a symbol and is among valid instruments
+(define (valid-instrument? instrument)
+  (define (get-valid-instruments)
+    '(piano organ guitar violin flute trumpet helicopter telephone))
+  (and (symbol? instrument)
+       (member? instrument (get-valid-instruments))))
+
+; Predicate for determining whether a pitch value is valid
+; - 'pitch' is valid if it's an integer in interval [0,127]
+(define (valid-pitch? pitch)
+  (and (integer? pitch)
+       (and (>= pitch 0) (<= pitch 127))))
+
+; Predicate for determining whether a duration valid is valid
+; - 'duration' is valid if its an integer > 0
+(define (valid-duration? duration)
+  (and (integer? duration) (> duration 0)))
+
+
+; =============================================================================
+; ELEMENT CONSTRUCTORS
+; =============================================================================
+
+; NOTE Constructor 
+; ----------------------------------------------------------------------------
+; In: 'pitch' - integer pitch value
+;     'duration' - integer duration value (number of time units)
+;     'instrument' - instrument symbol
+; Out: note element represented as a property list starting with 'type 'note
+(define (new-note pitch duration instrument)
+  (cond ((not (valid-pitch? pitch)) (error "Invalid pitch value"))
+	((not (integer? duration)) (error "Invalid duration value"))
+	((not (valid-instrument? instrument)) (error "Invalid instrument value"))
+	(else 
+	  (list 'type 'note 
+		'pitch pitch 
+		'duration duration 
+		'instrument instrument))))
+
+; PAUSE Constructor 
+; ----------------------------------------------------------------------------
+; In: 'duration' - integer duration value (number of time units)
+; Out: pause element represented as a property list with 'type 'pause
+(define (new-pause duration)
+  (cond ((not (integer? duration)) (error "Invalid duration value"))
+	(else (list 'type 'pause 'duration duration))))
+
+; SEQUENTIAL ELEMENT Constructor 
+; ----------------------------------------------------------------------------
+; In: 'elements' - variable length list of music elements
+; Out: property list with 'type 'sequential-element and a property 'elements
+;      which contains the nested music elements
+(define (new-sequential-element . elements)
+  (new-collection-element 'sequential-element elements))
+
+; PARALLEL ELEMENT Constructor 
+; ----------------------------------------------------------------------------
+; In: 'elements' - variable length list of music elements
+; Out: property list with 'type 'parallel-element and a property 'elements
+;      which contains the nested music elements
+(define (new-parallel-element . elements)
+  (new-collection-element 'parallel-element elements))
+
+; Generic Constructor for collection elements
+; ----------------------------------------------------------------------------
+; In: 'type' - type of the element (sequential/parallel)
+;     'elements' - list of elements to be included in the collection
+; Out: either a sequential element or parallel element property list
+(define (new-collection-element type elements)
+  (define (all-elements-music?)
+    (for-all? 
+      (lambda (element) (music-element? element))
+      elements))
+  (define (valid-type?)
+    (or 
+      (eq? type 'sequential-element) 
+      (eq? type 'parallel-element)))
+  (cond ((not (valid-type?)) (error "Invalid collection element type")) 
+        ((not (list? elements)) (error "elements must be a list"))
+	((not (all-elements-music?)) 
+	 (error "Input list must only contain music elements"))
+	(else (list 'type type 'elements elements))))
+
+
 ; =============================================================================
 ; Note
 ; =============================================================================
@@ -126,10 +192,7 @@
 ; Out: #t or #f 
 ; ** only returns true if 'obj' is a property list that has 'type of 'note
 (define (note? obj)
-  (if (plist? obj)
-    (eq? (get-plist-val 'type obj) 'note)
-    #f))
-
+  ((make-predicate 'note) obj))
 
 ; SELECTOR - PITCH
 ; In: 'note' - a note element
@@ -150,19 +213,6 @@
 	(else (instrument))))
 
 
-; TRANSPOSITION - NOTE
-; In: 'note' - a note element
-;     'delta' - pitch delta to be added to the existing pitch value
-; Out: new note with pitch = pitch + delta
-(define (transpose-note note delta)
-  (define (pitch) (get-plist-val 'pitch note))
-  (cond ((not (note? note)) (error "Not a note"))
-	((not (integer? delta)) (error "The pitch to be added must be an integer"))
-	(else (update-plist-val 'pitch (+ (pitch) delta) note))))
-
-
-
-
 ; =============================================================================
 ; Pause
 ; =============================================================================
@@ -179,31 +229,7 @@
 ; Out: #t or #f 
 ; ** only returns true if 'obj' is a property list that has 'type of 'pause
 (define (pause? obj)
-  (if (plist? obj)
-    (eq? (get-plist-val 'type obj) 'pause)
-    #f))
-
-; SELECTOR - DURATION already implemented for both note and pause, line 138
-
-
-
-; PREDICATE - MUSIC ELEMENT
-; In: 'obj' - any value
-; Out: #t or #f 
-; ** only returns true if 'obj' is a property list that has 'type of
-; any of the four music elements
-(define (music-element? obj)
-  (if (plist? obj)
-    (case (get-plist-val 'type obj)
-      ((note pause sequential-element parallel-element) #t)
-      (else #f))
-    #f))
-
-
-; SELECTOR - DURATION	
-; In: 'elem' - music element
-; Out: duration of the music element
-(define (get-duration elem)
+  ((make-predicate 'pause) obj))
 
 ; =============================================================================
 ; MUSIC ELEMENT FUNCTIONS 
@@ -228,7 +254,7 @@
 (define (get-duration elem)
   
   (define (invalid-input?) (not (music-element? elem)))
-  (define (basic-element?) (or (note? elem) (pause? elem)))
+  (define (head-basic?) (or (note? elem) (pause? elem)))
   (define (basic-duration) (get-plist-val 'duration elem))
   (define (elements) (get-elements elem))
   (define (first-element) (car elem))
@@ -236,118 +262,16 @@
   (define (max-of-elements) 
     (apply max (map get-duration (elements))))
   
-  (cond	((invalid-input?) (error "Input must be a music element"))
-        ((basic-elem?) (basic-duration)) 
+  (cond	;((invalid-input?) (error "Input must be a music element" elem))
+        ((head-basic?) (basic-duration)) 
 	((sequential-element? elem) (get-duration (elements)))
-	 ;(apply max (map get-duration (get-elements elem))))
+	((parallel-element? elem) 
+	 (apply max (map get-duration (elements))))
 	((null? (remaining-elements)) (get-duration (first-element)))
 	(else (+ 
 		(get-duration (first-element)) 
 		(get-duration (remaining-elements))))))
 
-
-; SCALING - MUSIC ELEMENT (general)
-; In: 'elem' - music element
-;     'factor' - a factor to multipy the durations by
-; Out: New, equivalent music element with all 
-;      the durations recursively scaled by 'factor'
-(define (scale elem factor)
-  (define (wrapped-elem) (list elem))
-  (define (seed) '())
-  (car (scale-list (wrapped-elem) factor (seed))))
-
-; Tail recursive helper method for (scale elem factor)
-; Takes a collection of music elements and returns a collection 
-; with each element scaled by a the factor
-(define (scale-list lst factor res)
-
-  (define (head) (car lst))
-  (define (tail) (cdr lst))
-  (define (head-basic?) (or (note? (head)) (pause? (head))))
-  (define (head-elements) (get-elements (head)))
-  (define (update-head-elements new-elems) 
-    (update-plist-val 'elements new-elems (head)))
-  (define (append-to-res elem)
-    (append res (list elem)))
-
-  (cond ((null? lst) res) 
-	((head-basic?) 
-	 (scale-list (tail) factor 
-		    (append-to-res (scale-basic (head) factor)))) 
-	(else 
-	  (scale-list (tail) factor 
-		     (append-to-res 
-		       (update-head-elements 
-			 (scale-list (head-elements) factor '())))))))
-
-
-
-; TRANSPOSE - MUSIC ELEMENT (general)
-; In: 'elem' - music element
-;     'factor' - a factor to multipy the durations by
-; Out: New, equivalent music element with 'delta' recursively
-;      added  to all the note pitches 
-(define (transpose elem delta) 
-  (define (wrapped-elem) (list elem))
-  (define (seed) '())
-  (car (transpose-list (wrapped-elem) delta (seed))))
-
-(define (transpose-list lst delta res)
-  
-  (define (head) (car lst))
-  (define (tail) (cdr lst))
-  (define (head-elements) (get-elements (head)))
-  (define (update-head-elements new-elems) 
-    (update-plist-val 'elements new-elems (head)))
-  (define (append-to-res elem)
-    (append res (list elem)))
-
-  (cond ((null? lst) res) 
-	((note? (head)) 
-	 (transpose-list (tail) delta 
-			 (append-to-res (transpose-note (head) delta)))) 
-	((pause? (head))
-	 (transpose-list (tail) delta 
-			 (append-to-res (head))))
-	(else 
-	  (transpose-list (tail) delta 
-			  (append-to-res 
-			    (update-head-elements 
-			      (transpose-list (head-elements) delta '())))))))
-  
-
-; TRANSPOSE - MUSIC ELEMENT (general)
-; In: 'elem' - music element
-;     'factor' - a factor to multipy the durations by
-; Out: New, equivalent music element with 'delta' recursively
-;      added  to all the note pitches 
-(define (reinstrument elem inst) 
-  (define (wrapped-elem) (list elem))
-  (define (seed) '())
-  (car (reinstrument-list (wrapped-elem) inst (seed))))
-
-(define (reinstrument-list lst inst res)
-  
-  (define (head) (car lst))
-  (define (tail) (cdr lst))
-  (define (head-elements) (get-elements (head)))
-  (define (update-head-elements new-elems)
-    (update-plist-val 'elements new-elems (head)))
-  (define (append-to-res elem)
-    (append res (list elem)))
-
-  (cond ((null? lst) res)
-	((note? (head))
-	 (reinstrument-list (tail) inst
-			 (append-to-res (reinstrument-note (head) inst))))
-	((pause? (head))
-	 (reinstrument-list (tail) inst
-			 (append-to-res (head))))
-	(else
-	  (reinstrument-list (tail) inst
-			  (append-to-res
-			    (update-head-elements
-			      (reinstrument-list (head-elements) inst '())))))))
 
 (define (reinstrument elem inst)
   (define (transformer) 
@@ -356,9 +280,24 @@
       (lambda (pause val) pause)))
   ((transformer) elem inst))
 
+(define (transpose elem delta)
+  (define (transformer)
+    (make-transformer
+      (lambda (note val) (transpose-note note val))
+      (lambda (pause val) pause)))
+  ((transformer) elem delta))
+
+(define (scale elem factor)
+  (define (transformer)
+    (make-transformer
+      (lambda (note val) (scale-basic note val))
+      (lambda (pause val) (scale-basic pause val))))
+  ((transformer) elem factor))
+
+
 (define (make-transformer trans-note trans-pause)
   (lambda (elem val)
-    (transform-list (list elem) trans-note trans-pause val '())))
+    (car (transform-list (list elem) trans-note trans-pause val '()))))
 
 (define (transform-list lst trans-note trans-pause val res)
   
@@ -460,7 +399,42 @@
         (eq? (get-plist-val 'type obj) type) 
         #f))))
   
+(define (flat-with-timestamps elem)
+  (flat-with-timestamps-h (list elem) 0 '()))
+  
+(define (flat-with-timestamps-h lst total res)
+  (define (head) (car lst))
+  (define (tail) (cdr lst))
+  (define (head-basic?) (or (note? (head)) (pause? (head))))
+  (define (head-elements) (get-elements (head)))
+  (define (update-head-elements new-elems)
+    (update-plist-val 'elements new-elems (head)))
+  (define (append-to-res elem)
+    (append res (list elem)))
+  (define (with-time elem timestamp)
+    (cond ((not plist?) (error "add-timestamp: not a plist"))
+	  (else (append elem (list 'timestamp timestamp)))))
+  (define (flat-with-timestamps-parallel par-elem)
+    (apply append (map 
+		    (lambda (e) (flat-with-timestamps-h (list e) total '())) 
+		    (get-elements par-elem))))
 
+  (cond ((null? lst) res)
+	((head-basic?)
+	 (flat-with-timestamps-h (tail) (+ total (get-duration (head)))
+			 (append res (list (with-time (head) total)))))
+	((sequential-element? (head))
+	 (flat-with-timestamps-h 
+	   (append (head-elements) (tail))
+	   total
+	   res))
+	((parallel-element? (head))
+	 (flat-with-timestamps-h
+	   (tail)
+	   (get-duration (head))
+	   (append res (flat-with-timestamps-parallel (head)))))
+	(else
+	  (error "should not be here..."))))
 
 
 ; =============================================================================
@@ -480,10 +454,8 @@
 ; ** only returns true if 'obj' is a property list
 ;    that has 'type of 'sequential-element
 (define (sequential-element? obj)
-  (if (plist? obj)
-    (eq? (get-plist-val 'type obj) 'sequential-element)
-    #f))
-
+  ((make-predicate 'sequential-element) obj))
+		
 ; =============================================================================
 ; PARALLEL ELEMENT
 ; =============================================================================
