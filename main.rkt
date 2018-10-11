@@ -86,13 +86,15 @@
 	((pred (car lst)) (for-all? pred (cdr lst)))
 	(else #f)))
 
+; Helper function that returns all possible instruments
+(define (list-instruments) 
+  '(piano organ guitar violin flute trumpet helicopter telephone))
+
 ; Predicate for determining whether an instrument value is valid
 ; - 'instrument' is valid if its a symbol and is among valid instruments
 (define (valid-instrument? instrument)
-  (define (get-valid-instruments)
-    '(piano organ guitar violin flute trumpet helicopter telephone))
   (and (symbol? instrument)
-       (member? instrument (get-valid-instruments))))
+       (member? instrument (list-instruments))))
 
 ; Predicate for determining whether a pitch value is valid
 ; - 'pitch' is valid if it's an integer in interval [0,127]
@@ -239,6 +241,16 @@
   (cond ((not (note? note)) (error "Input must be a note"))
 	((not (instrument)) (error "instrument attribute not found on note"))
 	(else (instrument))))
+
+; Timestamp (Note)
+; ............................................................................
+; ** Notes do not have a timestamp by default
+;    The timestamp is added only when flattening an element tree
+(define (get-timestamp note)
+  (define (timestamp) (get-plist-val 'timestamp note))
+  (cond ((not (note? note)) (error "Input must be a note"))
+	((not (timestamp)) (error "timestamp attribute not found on note"))
+	(else (timestamp))))
 
 ; Elements (Sequential element, Parallel element)
 ; ............................................................................
@@ -412,6 +424,7 @@
 ; ABSOLUTE TIME AND FLATTENING
 ; =============================================================================
 
+;
 ; Flatten an element and add absolute time 
 ; In: 'elem' - any music element
 ; Out: a flat list of elements containing 'elem and its sub-elements
@@ -424,11 +437,10 @@
 ; In : 'lst' - list of music elements
 ;      'total' - the total duration at the time of calling this function
 ;      'res' - a flat list where all elements (with abs time) are accumulated
-; Out: a flat list of notes and pauses with absolute timestamps
+; Out: a flat list of notes with absolute timestamps
 (define (flatten-with-abs-time-h lst total res)
   (define (head) (car lst))
   (define (tail) (cdr lst))
-  (define (head-basic?) (or (note? (head)) (pause? (head))))
   (define (head-elements) (get-elements (head)))
   (define (update-head-elements new-elems)
     (update-plist-val 'elements new-elems (head)))
@@ -442,10 +454,14 @@
 		    (lambda (e) (flatten-with-abs-time-h (list e) total '())) 
 		    (get-elements par-elem)))) 
   (cond ((null? lst) res)
-	((head-basic?)
+	((note? (head))
 	 (flatten-with-abs-time-h 
 	   (tail) (+ total (get-duration (head))) 
 	   (append-to-res (with-time (head) total))))
+	((pause? (head))
+	 (flatten-with-abs-time-h
+	   (tail) (+ total (get-duration (head)))
+	   res)) 
 	((sequential-element? (head))
 	 (flatten-with-abs-time-h 
 	   (append (head-elements) (tail))
@@ -453,15 +469,107 @@
 	   res))
 	((parallel-element? (head))
 	 (flatten-with-abs-time-h
-	   (tail)
-	   (get-duration (head))
+	   (tail) (+ total (get-duration (head)))
 	   (append res (flat-with-timestamps-parallel (head)))))
 	(else (error "Invalid input"))))
 
 
+; =============================================================================
+; (note-abs-time-with-duration) MAPPER
+; =============================================================================
 
+(define (map-to-note-abs-time-with-duration lst)
 
+  (define (instrument-to-channel inst)
+    (+ 1 (index-of (list-instruments) inst)))
+  (define (map-func e)
+    (note-abs-time-with-duration 
+      (get-timestamp e) 
+      (instrument-to-channel (get-plist-val 'instrument e)) 
+      (get-pitch e)
+      80
+      (get-duration e)))
+  
+  (map map-func lst))
+      
+  
 
+; =============================================================================
+; CANON SONG
+; =============================================================================
 
-
-
+(define (create-canon-in-d) 
+  (transform-to-midi-file-and-write-to-file!
+	  (map-to-note-abs-time-with-duration 
+	    (flatten-with-abs-time 
+	      (new-sequential-element
+		      (new-parallel-element
+			      (new-sequential-element
+				  (new-note 60 960 'piano)
+				  (new-pause 960)
+				  (new-note 55 960 'piano)
+				  (new-pause 960)
+				  (new-note 57 960 'piano)
+				  (new-pause 960)
+				  (new-note 52 960 'piano)
+				  (new-pause 960)
+				  (new-note 53 960 'piano)
+				  (new-pause 960)
+				  (new-note 48 960 'piano)
+				  (new-pause 960)
+				  (new-note 53 960 'piano)
+				  (new-pause 960)
+				  (new-note 55 960 'piano)
+			          (new-pause 960))
+			      (new-sequential-element
+				  (new-pause 960)
+				  (new-pause 960)
+				  (new-pause 960)
+				  (new-pause 960)
+				  (new-note 60 960 'piano)
+				  (new-pause 960)
+				  (new-note 59 960 'piano)
+				  (new-pause 960)
+				  (new-note 57 960 'piano)
+				  (new-pause 960)
+				  (new-note 55 960 'piano)
+				  (new-pause 960)
+				  (new-note 57 960 'piano)
+				  (new-pause 960)
+				  (new-note 59 960 'piano)
+				  (new-pause 960)))
+		      (new-parallel-element
+			      (new-sequential-element
+				  (new-note 60 960 'piano)
+				  (new-pause 960)
+				  (new-note 55 960 'piano)
+				  (new-pause 960)
+				  (new-note 57 960 'piano)
+				  (new-pause 960)
+				  (new-note 52 960 'piano)
+				  (new-pause 960)
+				  (new-note 53 960 'piano)
+				  (new-pause 960)
+				  (new-note 48 960 'piano)
+				  (new-pause 960)
+				  (new-note 53 960 'piano)
+				  (new-pause 960)
+				  (new-note 55 960)'piano)
+				  (new-pause 960))
+			      (new-sequential-element
+				  (new-pause 960)
+				  (new-pause 960)
+				  (new-pause 960)
+				  (new-pause 960)
+				  (new-note 60 960 'piano)
+				  (new-pause 960)
+				  (new-note 59 960 'piano)
+				  (new-pause 960)
+				  (new-note 57 960 'piano)
+				  (new-pause 960)
+				  (new-note 55 960 'piano)
+				  (new-pause 960)
+				  (new-note 57 960 'piano)
+				  (new-pause 960)
+				  (new-note 59 960 'piano)
+				  (new-pause 960))))) "canond.mid"))

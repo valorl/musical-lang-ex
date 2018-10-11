@@ -1,0 +1,3 @@
+Use this package if you use Racket.
+Racket is R5RS based in the starting point, but has been expanded and changed a lot.
+This package provides to Racket modules, and relies on byte strings (which are different from R6RS byte vectors).
