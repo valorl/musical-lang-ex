@@ -493,83 +493,53 @@
   (map map-func lst))
       
   
+; =============================================================================
+; Constructor aliases for more concise song definitions
+; =============================================================================
+(define (note p d i) (new-note p d i))
+(define (pause d) (new-pause d))
+(define (par . els) (apply new-parallel-element els))
+(define (seq . els) (apply new-sequential-element els))
 
 ; =============================================================================
 ; CANON SONG
 ; =============================================================================
+(define (canon-in-d)
+  (define (note-dur) 2880)
+  (define (note-inst) 'piano)
+  (define P (pause (note-dur)))
+  (define C3 (note 48 (note-dur) (note-inst)))
+  (define E3 (note 52 (note-dur) (note-inst)))
+  (define F3 (note 53 (note-dur) (note-inst)))
+  (define G3 (note 55 (note-dur) (note-inst)))
+  (define A3 (note 57 (note-dur) (note-inst)))
+  (define B3 (note 59 (note-dur) (note-inst)))
+  (define C4 (note 60 (note-dur) (note-inst)))
+  (define D4 (note 62 (note-dur) (note-inst)))
+  (define E4 (note 64 (note-dur) (note-inst)))
+  (define F4 (note 65 (note-dur) (note-inst)))
+  (define G4 (note 67 (note-dur) (note-inst)))
+  (define A4 (note 69 (note-dur) (note-inst)))
+  (define B4 (note 71 (note-dur) (note-inst)))
+  (define C5 (note 72 (note-dur) (note-inst)))
+  (define D5 (note 74 (note-dur) (note-inst)))
+  (define E5 (note 76 (note-dur) (note-inst)))
 
-(define (create-canon-in-d) 
-  (transform-to-midi-file-and-write-to-file!
-	  (map-to-note-abs-time-with-duration 
-	    (flatten-with-abs-time 
-	      (new-sequential-element
-		      (new-parallel-element
-			      (new-sequential-element
-				  (new-note 60 960 'piano)
-				  (new-pause 960)
-				  (new-note 55 960 'piano)
-				  (new-pause 960)
-				  (new-note 57 960 'piano)
-				  (new-pause 960)
-				  (new-note 52 960 'piano)
-				  (new-pause 960)
-				  (new-note 53 960 'piano)
-				  (new-pause 960)
-				  (new-note 48 960 'piano)
-				  (new-pause 960)
-				  (new-note 53 960 'piano)
-				  (new-pause 960)
-				  (new-note 55 960 'piano)
-			          (new-pause 960))
-			      (new-sequential-element
-				  (new-pause 960)
-				  (new-pause 960)
-				  (new-pause 960)
-				  (new-pause 960)
-				  (new-note 60 960 'piano)
-				  (new-pause 960)
-				  (new-note 59 960 'piano)
-				  (new-pause 960)
-				  (new-note 57 960 'piano)
-				  (new-pause 960)
-				  (new-note 55 960 'piano)
-				  (new-pause 960)
-				  (new-note 57 960 'piano)
-				  (new-pause 960)
-				  (new-note 59 960 'piano)
-				  (new-pause 960)))
-		      (new-parallel-element
-			      (new-sequential-element
-				  (new-note 60 960 'piano)
-				  (new-pause 960)
-				  (new-note 55 960 'piano)
-				  (new-pause 960)
-				  (new-note 57 960 'piano)
-				  (new-pause 960)
-				  (new-note 52 960 'piano)
-				  (new-pause 960)
-				  (new-note 53 960 'piano)
-				  (new-pause 960)
-				  (new-note 48 960 'piano)
-				  (new-pause 960)
-				  (new-note 53 960 'piano)
-				  (new-pause 960)
-				  (new-note 55 960)'piano)
-				  (new-pause 960))
-			      (new-sequential-element
-				  (new-pause 960)
-				  (new-pause 960)
-				  (new-pause 960)
-				  (new-pause 960)
-				  (new-note 60 960 'piano)
-				  (new-pause 960)
-				  (new-note 59 960 'piano)
-				  (new-pause 960)
-				  (new-note 57 960 'piano)
-				  (new-pause 960)
-				  (new-note 55 960 'piano)
-				  (new-pause 960)
-				  (new-note 57 960 'piano)
-				  (new-pause 960)
-				  (new-note 59 960 'piano)
-				  (new-pause 960))))) "canond.mid"))
+  (map-to-note-abs-time-with-duration
+    (flatten-with-abs-time
+      (seq
+	(par
+	  (seq C4   G3   A3   E3   F3   C3   F3   G3 )
+	  (seq E4   D4   C4   B3   A3   G3   A3   B3 ))
+        (par
+	  (seq C4   G3   A3   E3   F3   C3   F3   G3 )
+	  (seq E4   D4   C4   B3   A3   G3   A3   B3 ))
+	(par
+	  (seq E5   D5   C5   B4   A4   G4   A4   B4 )
+	  (seq C4   G3   A3   E3   F3   C3   F3   G3 )
+	  (seq G4   B4   P    G4   C4   E4   F4   D4 ))))))
+
+
+
+(define (write-canon-in-d!)
+  (transform-to-midi-file-and-write-to-file! (canon-in-d) "canon-in-d.mid"))
